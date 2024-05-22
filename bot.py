@@ -125,16 +125,27 @@ class ConfirmDeleteView(discord.ui.View):
 
     @discord.ui.button(label="OUI", style=discord.ButtonStyle.green)
     async def confirm_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Indiquer que la réponse peut prendre du temps
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Vous devez être administrateur pour effectuer cette action.", ephemeral=True)
+            return
+        
         await interaction.response.defer()
-        await self.channel.purge(limit=None)
-        # Utiliser followup.send après defer
+        await self.delete_messages_in_batches(self.channel)
         await interaction.followup.send("Tous les messages ont été supprimés.", ephemeral=True)
         self.stop()
 
+    async def delete_messages_in_batches(self, channel, batch_size=100):
+        while True:
+            deleted = await channel.purge(limit=batch_size)
+            if len(deleted) < batch_size:
+                break
+
     @discord.ui.button(label="NON", style=discord.ButtonStyle.red)
     async def cancel_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Pas besoin de defer si on répond immédiatement
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Vous devez être administrateur pour effectuer cette action.", ephemeral=True)
+            return
+        
         await interaction.response.defer()
         await interaction.followup.send("Suppression annulée.", ephemeral=True)
         self.stop()
