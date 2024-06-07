@@ -17,4 +17,3 @@ Must have admin privileges in the discord server
 
 !list_deletions : show a list of all automatic delete active.  
 
-Test  
