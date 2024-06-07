@@ -16,5 +16,3 @@ Must have admin privileges in the discord server
 !automatedelete : set a hour and a day of the week. It will automatically delete all messages in the channel where the command was used. Ex : 11:00 AM, Wednesday. It will delete every wednesday at 11:00 AM  
 
 !list_deletions : show a list of all automatic delete active.  
-
-Test 
