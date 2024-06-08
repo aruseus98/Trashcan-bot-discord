@@ -4,7 +4,9 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import logging
 from views.selects import TimezoneSelect, AutomatedeleteView, DailyDeleteView, DeleteButton
-from utils.delete_tasks import bulk_delete_messages, delete_old_messages, start_deletion_task, schedule_weekly_deletion, delete_messages_in_batches, active_deletions
+from utils.delete_tasks import bulk_delete_messages, delete_old_messages, start_deletion_task, schedule_weekly_deletion, delete_messages_in_batches, active_deletions, start_daily_deletion_task, reload_tasks
+from utils.file_storage import load_tasks, save_tasks
+
 # Configurez le logging pour afficher les messages dans la console
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
 logger = logging.getLogger()
@@ -110,7 +112,7 @@ async def list_deletions(ctx):
 
     for index, deletion in enumerate(active_deletions):
         logger.info(f"Suppression trouvée: {deletion}")
-        if deletion['task'].done():
+        if deletion['task'] and deletion['task'].done():
             status = "Completed or Cancelled"
         else:
             status = "Active"
@@ -123,4 +125,10 @@ async def list_deletions(ctx):
     logger.info("Commande !list_deletions exécutée avec succès.")
 
 # Lancer le bot avec le token
+@bot.event
+async def on_ready():
+    logger.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
+    logger.info('------')
+    reload_tasks(bot)
+
 bot.run(token)
