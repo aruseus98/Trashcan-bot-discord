@@ -3,6 +3,7 @@ import discord
 import logging
 from datetime import datetime, timedelta
 import pytz
+from utils.file_storage import save_tasks, load_tasks
 
 logger = logging.getLogger()
 
@@ -92,6 +93,7 @@ def start_deletion_task(channel, time_str, day_of_week, timezone_str):
     task = asyncio.create_task(schedule_weekly_deletion(channel, start_time, day_of_week, timezone))
     task_info['task'] = task
     active_deletions.append(task_info)
+    save_tasks(active_deletions)  # Sauvegarder les tâches après chaque modification
     logger.info(f"Tâche de suppression ajoutée: {task_info}")
 
 async def schedule_daily_deletion(channel, start_time, timezone):
@@ -128,4 +130,15 @@ def start_daily_deletion_task(channel, time_str, timezone_str):
     task = asyncio.create_task(schedule_daily_deletion(channel, start_time, timezone))
     task_info['task'] = task
     active_deletions.append(task_info)
+    save_tasks(active_deletions)  # Sauvegarder les tâches après chaque modification
     logger.info(f"Tâche de suppression quotidienne ajoutée: {task_info}")
+
+def reload_tasks(bot):
+    tasks = load_tasks()
+    for task in tasks:
+        channel = discord.utils.get(bot.get_all_channels(), id=task['channel_id'])
+        if channel is not None:
+            if task['day_of_week'] == 'Daily':
+                start_daily_deletion_task(channel, task['start_time'], task['timezone'])
+            else:
+                start_deletion_task(channel, task['start_time'], task['day_of_week'], task['timezone'])
