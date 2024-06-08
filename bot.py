@@ -3,8 +3,9 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import logging
-from views.selects import TimezoneSelect, AutomatedeleteView, DeleteButton
-from utils.delete_tasks import bulk_delete_messages, delete_old_messages, start_deletion_task, schedule_weekly_deletion, delete_messages_in_batches
+from views.selects import TimezoneSelect, AutomatedeleteView, DailyDeleteView, DeleteButton
+from utils.delete_tasks import bulk_delete_messages, delete_old_messages, start_deletion_task, schedule_weekly_deletion, delete_messages_in_batches, active_deletions, start_daily_deletion_task, reload_tasks
+from utils.file_storage import load_tasks, save_tasks
 
 # Configurez le logging pour afficher les messages dans la console
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
@@ -27,7 +28,6 @@ intents.message_content = True
 
 # Initialiser le bot avec les intents spécifiés
 bot = commands.Bot(command_prefix='!', intents=intents)
-active_deletions = []
 
 class ConfirmDeleteView(discord.ui.View):
     def __init__(self, channel):
@@ -77,6 +77,14 @@ class ConfirmDeleteView(discord.ui.View):
         self.stop()
 
 @bot.command()
+async def dailydelete(ctx):
+    if not ctx.author.guild_permissions.administrator:
+        await ctx.send("Vous devez être administrateur pour exécuter cette commande.")
+        return
+    view = DailyDeleteView()
+    await ctx.send("Sélectionnez le fuseau horaire pour la suppression quotidienne des messages :", view=view, ephemeral=True)
+
+@bot.command()
 async def deleteall(ctx):
     if not ctx.author.guild_permissions.administrator:
         await ctx.send("Vous devez être administrateur pour effectuer cette action.", delete_after=10)
@@ -95,12 +103,16 @@ async def automatedelete(ctx):
 
 @bot.command()
 async def list_deletions(ctx):
+    logger.info("Commande !list_deletions appelée.")
+    logger.info(f"Contenu de active_deletions: {active_deletions}")
+
     if not active_deletions:
-        await ctx.send("Aucune suppression automatique programmée.", ephemeral=True)
+        await ctx.send("Aucune suppression automatique programmée.", delete_after=10)
         return
 
     for index, deletion in enumerate(active_deletions):
-        if deletion['task'].done():
+        logger.info(f"Suppression trouvée: {deletion}")
+        if deletion['task'] and deletion['task'].done():
             status = "Completed or Cancelled"
         else:
             status = "Active"
@@ -108,7 +120,15 @@ async def list_deletions(ctx):
         view.add_item(DeleteButton(index))
         message = (f"Canal: {deletion['channel_name']}, Heure de début: {deletion['start_time']}, "
                    f"Jour: {deletion['day_of_week']}, Fuseau horaire: {deletion['timezone']}, Status: {status}")
-        await ctx.send(message, view=view, ephemeral=True)
+        await ctx.send(message, view=view, delete_after=60)
+
+    logger.info("Commande !list_deletions exécutée avec succès.")
 
 # Lancer le bot avec le token
+@bot.event
+async def on_ready():
+    logger.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
+    logger.info('------')
+    reload_tasks(bot)
+
 bot.run(token)

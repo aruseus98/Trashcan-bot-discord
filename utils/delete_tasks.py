@@ -3,9 +3,11 @@ import discord
 import logging
 from datetime import datetime, timedelta
 import pytz
+from utils.file_storage import save_tasks, load_tasks
 
 logger = logging.getLogger()
 
+# Définir la liste des suppressions actives globalement
 active_deletions = []
 
 async def bulk_delete_messages(channel):
@@ -91,3 +93,52 @@ def start_deletion_task(channel, time_str, day_of_week, timezone_str):
     task = asyncio.create_task(schedule_weekly_deletion(channel, start_time, day_of_week, timezone))
     task_info['task'] = task
     active_deletions.append(task_info)
+    save_tasks(active_deletions)  # Sauvegarder les tâches après chaque modification
+    logger.info(f"Tâche de suppression ajoutée: {task_info}")
+
+async def schedule_daily_deletion(channel, start_time, timezone):
+    while True:
+        now = datetime.now(timezone)
+        next_deletion_datetime = now.replace(hour=start_time.hour, minute=start_time.minute, second=0, microsecond=0)
+        if now > next_deletion_datetime:
+            next_deletion_datetime += timedelta(days=1)
+        
+        seconds_until_next_deletion = (next_deletion_datetime - now).total_seconds()
+        logger.info(f"Current time: {now}")
+        logger.info(f"Next deletion datetime: {next_deletion_datetime}")
+        logger.info(f"Seconds until deletion: {seconds_until_next_deletion}")
+        logger.info("Starting daily deletion process.")
+        
+        await asyncio.sleep(seconds_until_next_deletion)
+        await delete_messages_in_batches(channel, batch_size=100)
+        logger.info("Daily deletion performed. Waiting for next day.")
+        await asyncio.sleep(24 * 3600)
+
+def start_daily_deletion_task(channel, time_str, timezone_str):
+    timezone = pytz.timezone(timezone_str)
+    start_time = datetime.strptime(time_str, "%H:%M")
+    start_time = timezone.localize(datetime.combine(datetime.today(), start_time.time()))
+
+    task_info = {
+        'channel_name': channel.name,
+        'channel_id': channel.id,
+        'start_time': time_str,
+        'day_of_week': 'Daily',
+        'timezone': timezone_str,
+        'task': None
+    }
+    task = asyncio.create_task(schedule_daily_deletion(channel, start_time, timezone))
+    task_info['task'] = task
+    active_deletions.append(task_info)
+    save_tasks(active_deletions)  # Sauvegarder les tâches après chaque modification
+    logger.info(f"Tâche de suppression quotidienne ajoutée: {task_info}")
+
+def reload_tasks(bot):
+    tasks = load_tasks()
+    for task in tasks:
+        channel = discord.utils.get(bot.get_all_channels(), id=task['channel_id'])
+        if channel is not None:
+            if task['day_of_week'] == 'Daily':
+                start_daily_deletion_task(channel, task['start_time'], task['timezone'])
+            else:
+                start_deletion_task(channel, task['start_time'], task['day_of_week'], task['timezone'])
