@@ -1,6 +1,7 @@
 import discord
 from discord.ui import Select, View
 from utils.delete_tasks import start_deletion_task, start_daily_deletion_task, active_deletions
+from utils.file_storage import save_tasks
 
 class TimezoneSelect(Select):
     def __init__(self):
@@ -20,9 +21,10 @@ class TimezoneSelect(Select):
     
     async def callback(self, interaction: discord.Interaction):
         self.view.timezone = self.values[0]
-        from views.start_time_modal import StartTimeModal  # Importer ici pour éviter l'importation circulaire
+        from views.start_time_modal import StartTimeModal
         modal = StartTimeModal(self.view)
         await interaction.response.send_modal(modal)
+        await interaction.followup.send("Sélectionnez une heure pour la suppression.", ephemeral=True)
 
 class DayOfWeekSelect(Select):
     def __init__(self, custom_view):
@@ -53,14 +55,61 @@ class AutomatedeleteView(View):
         self.add_item(TimezoneSelect())
 
 class DeleteButton(discord.ui.Button):
-    def __init__(self, index):
+    def __init__(self, task_id):
         super().__init__(label="Annuler", style=discord.ButtonStyle.red)
-        self.index = index
+        self.task_id = task_id
 
     async def callback(self, interaction: discord.Interaction):
-        task_info = active_deletions.pop(self.index)
-        task_info['task'].cancel()
-        await interaction.response.send_message("Automatisation de suppression annulée.", ephemeral=True)
+        # Vérification des permissions d'administrateur
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Vous devez être administrateur pour effectuer cette action.", ephemeral=True)
+            return
+        
+        # Chercher la tâche correspondant à l'ID
+        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
+        if task_info:
+            active_deletions.remove(task_info)
+            task_info['task'].cancel()  # Annuler la tâche asyncio
+            save_tasks(active_deletions)  # Sauvegarder après modification
+            await interaction.response.send_message("Automatisation de suppression annulée.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Tâche introuvable ou déjà supprimée.", ephemeral=True)
+
+class StopButton(discord.ui.Button):
+    def __init__(self, task_id):
+        super().__init__(label="Stopper", style=discord.ButtonStyle.gray)
+        self.task_id = task_id
+
+    async def callback(self, interaction: discord.Interaction):
+        # Chercher la tâche correspondant à l'ID
+        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
+        if task_info:
+            if task_info['status'] == 'inactive':
+                await interaction.response.send_message("Cette tâche est déjà inactive.", ephemeral=True)
+            else:
+                task_info['status'] = 'inactive'
+                save_tasks(active_deletions) 
+                await interaction.response.send_message(f"Tâche stoppée avec succès.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Tâche introuvable.", ephemeral=True)
+
+class ActivateButton(discord.ui.Button):
+    def __init__(self, task_id):
+        super().__init__(label="Activer", style=discord.ButtonStyle.green)
+        self.task_id = task_id
+
+    async def callback(self, interaction: discord.Interaction):
+        # Chercher la tâche correspondant à l'ID
+        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
+        if task_info:
+            if task_info['status'] == 'active':
+                await interaction.response.send_message("Cette tâche est déjà active.", ephemeral=True)
+            else:
+                task_info['status'] = 'active' 
+                save_tasks(active_deletions) 
+                await interaction.response.send_message("Tâche réactivée avec succès.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Tâche introuvable.", ephemeral=True)
 
 class DailyDeleteView(View):
     def __init__(self):

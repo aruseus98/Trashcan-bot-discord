@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import logging
-from views.selects import TimezoneSelect, AutomatedeleteView, DailyDeleteView, DeleteButton
+from views.selects import TimezoneSelect, AutomatedeleteView, DailyDeleteView, DeleteButton, StopButton, ActivateButton
 from utils.delete_tasks import bulk_delete_messages, delete_old_messages, start_deletion_task, schedule_weekly_deletion, delete_messages_in_batches, active_deletions, start_daily_deletion_task, reload_tasks
 from utils.file_storage import load_tasks, save_tasks
 
@@ -91,7 +91,7 @@ async def deleteall(ctx):
         return
 
     view = ConfirmDeleteView(ctx.channel)
-    await ctx.send("Voulez-vous supprimer tous les messages du canal actuel ?", view=view)
+    await ctx.send("Voulez-vous supprimer tous les messages du canal actuel ?", view=view, ephemeral=True)
 
 @bot.command()
 async def automatedelete(ctx):
@@ -110,19 +110,29 @@ async def list_deletions(ctx):
         await ctx.send("Aucune suppression automatique programmée.", delete_after=10)
         return
 
-    for index, deletion in enumerate(active_deletions):
+    for deletion in active_deletions:
         logger.info(f"Suppression trouvée: {deletion}")
         if deletion['task'] and deletion['task'].done():
             status = "Completed or Cancelled"
         else:
-            status = "Active"
+            status = deletion['status']  # Afficher le statut (active/inactive)
+
+        # Utiliser l'ID de la tâche
         view = discord.ui.View()
-        view.add_item(DeleteButton(index))
+        view.add_item(DeleteButton(deletion['id']))  # Passer l'ID de la tâche pour l'annuler
+
+        # Ajouter le bouton "Stopper" ou "Activer" en fonction du statut
+        if deletion['status'] == 'active':
+            view.add_item(StopButton(deletion['id']))  # Bouton pour stopper la tâche
+        else:
+            view.add_item(ActivateButton(deletion['id']))  # Bouton pour réactiver la tâche
+
         message = (f"Canal: {deletion['channel_name']}, Heure de début: {deletion['start_time']}, "
                    f"Jour: {deletion['day_of_week']}, Fuseau horaire: {deletion['timezone']}, Status: {status}")
         await ctx.send(message, view=view, delete_after=60)
 
     logger.info("Commande !list_deletions exécutée avec succès.")
+
 
 # Lancer le bot avec le token
 @bot.event
