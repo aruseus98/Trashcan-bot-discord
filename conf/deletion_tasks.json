@@ -1,0 +1,20 @@
+[
+    {
+        "id": "10cceefd-e880-4ce5-bbc6-ef8792e7cb7a",
+        "channel_name": "test-trashcan",
+        "channel_id": "1282620028839002164",
+        "start_time": "15:50",
+        "day_of_week": "Saturday",
+        "timezone": "Europe/Paris",
+        "status": "inactive"
+    },
+    {
+        "id": "031eb0db-d4c8-47f4-ab2c-28f35c283bbd",
+        "channel_name": "test-trashcan",
+        "channel_id": "1282620028839002164",
+        "start_time": "16:05",
+        "day_of_week": "Saturday",
+        "timezone": "Europe/Paris",
+        "status": "active"
+    }
+]

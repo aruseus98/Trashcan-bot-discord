@@ -1,0 +1,24 @@
+services:
+  bot:
+    build: ./bot
+    volumes:
+      - ./bot:/app  # Partage des fichiers du bot
+      - ./conf:/app/conf  # Partage du dossier conf avec le fichier deletion_tasks.json
+    networks:
+      - botnet
+
+  dashboard:
+    build: ./dashboard
+    volumes:
+      - ./dashboard:/app  # Partage des fichiers du dashboard
+      - ./conf:/app/conf  # Partage du dossier conf pour que le dashboard accède au fichier JSON
+    ports:
+      - "5000:5000"  # Exposer le dashboard Flask sur le port 5000
+    depends_on:
+      - bot
+    networks:
+      - botnet
+
+networks:
+  botnet:
+    driver: bridge

@@ -54,63 +54,6 @@ class AutomatedeleteView(View):
         self.frequency = None
         self.add_item(TimezoneSelect())
 
-class DeleteButton(discord.ui.Button):
-    def __init__(self, task_id):
-        super().__init__(label="Annuler", style=discord.ButtonStyle.red)
-        self.task_id = task_id
-
-    async def callback(self, interaction: discord.Interaction):
-        # Vérification des permissions d'administrateur
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Vous devez être administrateur pour effectuer cette action.", ephemeral=True)
-            return
-        
-        # Chercher la tâche correspondant à l'ID
-        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
-        if task_info:
-            active_deletions.remove(task_info)
-            task_info['task'].cancel()  # Annuler la tâche asyncio
-            save_tasks(active_deletions)  # Sauvegarder après modification
-            await interaction.response.send_message("Automatisation de suppression annulée.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Tâche introuvable ou déjà supprimée.", ephemeral=True)
-
-class StopButton(discord.ui.Button):
-    def __init__(self, task_id):
-        super().__init__(label="Stopper", style=discord.ButtonStyle.gray)
-        self.task_id = task_id
-
-    async def callback(self, interaction: discord.Interaction):
-        # Chercher la tâche correspondant à l'ID
-        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
-        if task_info:
-            if task_info['status'] == 'inactive':
-                await interaction.response.send_message("Cette tâche est déjà inactive.", ephemeral=True)
-            else:
-                task_info['status'] = 'inactive'
-                save_tasks(active_deletions) 
-                await interaction.response.send_message(f"Tâche stoppée avec succès.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Tâche introuvable.", ephemeral=True)
-
-class ActivateButton(discord.ui.Button):
-    def __init__(self, task_id):
-        super().__init__(label="Activer", style=discord.ButtonStyle.green)
-        self.task_id = task_id
-
-    async def callback(self, interaction: discord.Interaction):
-        # Chercher la tâche correspondant à l'ID
-        task_info = next((t for t in active_deletions if t['id'] == self.task_id), None)
-        if task_info:
-            if task_info['status'] == 'active':
-                await interaction.response.send_message("Cette tâche est déjà active.", ephemeral=True)
-            else:
-                task_info['status'] = 'active' 
-                save_tasks(active_deletions) 
-                await interaction.response.send_message("Tâche réactivée avec succès.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Tâche introuvable.", ephemeral=True)
-
 class DailyDeleteView(View):
     def __init__(self):
         super().__init__()

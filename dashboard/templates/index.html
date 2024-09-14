@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Bot Discord</title>
+    <script>
+        // Fonction pour charger les canaux en fonction du serveur sélectionné
+        function loadChannels() {
+        var serverId = document.getElementById("discord-servers").value;
+        var channelSelect = document.getElementById("channel_name");
+        var serverInput = document.getElementById("selected-server-id");  // champ caché pour le serveur sélectionné
+
+        channelSelect.innerHTML = "";  // Réinitialiser la liste des canaux
+
+        if (serverId === "---") {
+            // Si aucun serveur n'est sélectionné, ne pas effectuer la requête
+            serverInput.value = "";  // S'assurer que le champ caché est vide si aucun serveur sélectionné
+            return;
+        }
+
+        serverInput.value = serverId;  // Mettre à jour la valeur du serveur sélectionné dans le champ caché
+
+        // Faire la requête à l'API pour obtenir les canaux
+        fetch(`/api/guilds/${serverId}/channels`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Erreur lors de la récupération des canaux");
+            }
+            return response.json();  // Assurez-vous que la réponse est bien en JSON
+        })
+        .then(data => {
+            // Vérifier si les données sont correctes et contiennent des canaux
+            if (Array.isArray(data)) {
+                data.forEach(function(channel) {
+                    var option = document.createElement("option");
+                    option.value = channel.id;
+                    option.text = channel.name;
+                    channelSelect.appendChild(option);
+                });
+            } else {
+                console.error("Données des canaux non valides : ", data);
+            }
+        })
+        .catch(error => console.error("Erreur lors de la récupération des canaux:", error));
+        }
+
+        function submitTaskForm() {
+            var serverId = document.getElementById("discord-servers").value;
+            var serverInput = document.getElementById("selected-server-id");
+
+            if (serverId === "---") {
+                alert("Veuillez sélectionner un serveur.");
+                return false;
+            }
+
+            // Mettre à jour la valeur cachée avec l'ID du serveur sélectionné avant soumission
+            serverInput.value = serverId;
+            console.log("Formulaire soumis avec serveur:", serverId);
+            console.log("Données du formulaire: ", document.getElementById("task-form"));
+            return true;  // Permettre la soumission du formulaire
+        }
+
+        function updateTaskStatus(taskId, newStatus) {
+            fetch(`/api/task/${taskId}/status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Tâche mise à jour:', data);
+                location.reload();  // Recharger la page après la mise à jour
+            })
+            .catch(error => console.error("Erreur lors de la mise à jour de la tâche:", error));
+        }
+    </script>
+</head>
+<body>
+
+    <h1>Serveurs Discord</h1>
+    
+    <!-- Ajout de la sélection des serveurs -->
+    <form id="task-form" method="POST" action="/api/task" onsubmit="return submitTaskForm()">
+        <!-- Sélection du serveur Discord -->
+        <label for="discord-servers">Sélectionnez un serveur Discord :</label>
+        <select id="discord-servers" name="discord_server" onchange="loadChannels()" required>
+            <option value="---">Sélectionnez un serveur</option> <!-- Option par défaut -->
+            {% for server in servers %}
+            <option value="{{ server.id }}">{{ server.name }}</option>
+            {% endfor %}
+        </select><br>
+    
+        <!-- Sélection des canaux -->
+        <label for="channel_name">Nom du canal :</label>
+        <select id="channel_name" name="channel_name" required>
+            <!-- Les options des canaux seront ajoutées ici dynamiquement -->
+        </select><br>
+    
+        <!-- Heure de début -->
+        <label for="start_time">Heure de début (HH:MM) :</label>
+        <input type="text" id="start_time" name="start_time" required><br>
+    
+        <!-- Jour de la semaine -->
+        <label for="day_of_week">Jour :</label>
+        <select id="day_of_week" name="day_of_week">
+            <option value="Monday">Lundi</option>
+            <option value="Tuesday">Mardi</option>
+            <option value="Wednesday">Mercredi</option>
+            <option value="Thursday">Jeudi</option>
+            <option value="Friday">Vendredi</option>
+            <option value="Saturday">Samedi</option>
+            <option value="Sunday">Dimanche</option>
+        </select><br>
+    
+        <!-- Fuseau horaire -->
+        <label for="timezone">Choisissez un fuseau horaire :</label>
+        <select id="timezone" name="timezone">
+            <option value="Europe/London">Europe/London (GMT/BST - UK)</option>
+            <option value="Europe/Paris">Europe/Paris (CET/CEST - Central Europe)</option>
+            <!-- Autres options de fuseaux horaires -->
+        </select><br>
+    
+        <!-- Champ caché pour stocker l'ID du serveur sélectionné -->
+        <input type="hidden" id="selected-server-id" name="discord_server">
+        
+        <!-- Statut de la tâche (actif par défaut) -->
+        <input type="hidden" name="status" value="active">
+    
+        <button type="submit">Ajouter la tâche</button>
+    </form>    
+
+    <h1>Gestion des Tâches Programmées</h1>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID de la tâche</th>
+                <th>Nom du canal</th>
+                <th>Heure de début</th>
+                <th>Jour</th>
+                <th>Fuseau horaire</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task.id }}</td>
+                <td>{{ task.channel_name }}</td>
+                <td>{{ task.start_time }}</td>
+                <td>{{ task.day_of_week }}</td>
+                <td>{{ task.timezone }}</td>
+                <td>{{ task.status }}</td>
+                <td>
+                    {% if task.status == "active" %}
+                    <button onclick="updateTaskStatus('{{ task.id }}', 'inactive')">Stopper</button>
+                    {% else %}
+                    <button onclick="updateTaskStatus('{{ task.id }}', 'active')">Activer</button>
+                    {% endif %}
+
+                    <!-- Bouton pour supprimer la tâche -->
+                    <form method="post" action="/api/task/{{ task.id }}/delete" style="display:inline;">
+                        <button type="submit" onclick="return confirm('Voulez-vous vraiment supprimer cette tâche ?')">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

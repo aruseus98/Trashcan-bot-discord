@@ -9,7 +9,7 @@ if not os.path.exists(CONF_DIR):
 
 def save_tasks(tasks):
     with open(FILE_PATH, 'w') as file:
-        json.dump(tasks, file, default=str)
+        json.dump(tasks, file, default=str, indent=4)
 
 def load_tasks():
     if not os.path.exists(FILE_PATH):
